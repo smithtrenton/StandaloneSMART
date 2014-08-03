@@ -1,0 +1,10 @@
+program new;
+{$i StandaloneSMART/standaloneSMART.simba}
+
+var
+  Smart: TSmartClient;
+
+begin
+  Smart.Init;
+  Smart.Free;
+end.
