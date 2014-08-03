@@ -1,0 +1,255 @@
+(*
+StandaloneSMART
+========
+
+Contains all the functions needed to load runescape with SMART, using either
+RS3 or OSRS.
+
+*)
+
+{$loadlib libsmartremote}
+{$i ..\StandaloneSMART\drawing.simba}
+
+const
+  __OSRSURL = ['http://oldschool', '.runescape.com'];
+  __OSRSWORLDSURL = 'http://oldschool.runescape.com/slu';
+  __RS3URL = 'http://www.runescape.com/game.ws?j=1';
+  __OSRSDEFAULTWORLD = '94';
+
+type
+  TRSVersion = (OSRS, RS3);
+  TSmartSettings = record
+    ShowConsole, ForceNew: Boolean;
+    RSVersion: TRSVersion;
+    Plugins: TStringArray;
+  end;
+
+  TSmartClient = record
+    PID, Target, Width, Height: Integer;
+    Loaded: Boolean;
+    Image: TMufasaBitmap;
+  end;
+
+var
+  SMARTSettings: TSmartSettings = [False, False, OSRS, ['']];
+
+function TSmartSettings.GetPIDs: TIntegerArray;
+var
+  i, l: Integer;
+begin
+  l := SmartGetClients(true);
+  if (l < 1) then Exit;
+
+  setLength(Result, l);
+  for i := 0 to (l - 1) do
+    result[i] := SmartGetAvailablePID(i);
+end;
+
+procedure TSmartSettings.KillAll;
+var
+  i, freed: Integer;
+  PIDs: TIntegerArray;
+begin
+  PIDs := self.GetPIDs;
+  writeln('  Attempting to kill ' + ToStr(Length(PIDs)) + ' SMARTs: ', PIDs);
+  if (Length(PIDs) > 0) then
+  for i := 0 to High(PIDs) do
+  try
+    SmartKillClient(PIDs[i]);
+    Inc(freed);
+  except
+    writeln('    Failed to kill SMART[' + ToStr(PIDs[i]) + ']');
+  end;
+  writeln('  Killed ' + ToStr(freed) + ' SMARTs');
+end;
+
+function TSmartSettings.GetOSRSWorld: String;
+var
+  i: Integer;
+  page: TStringArray;
+begin
+  page := MultiBetween(GetPage(__OSRSWORLDSURL), '"oldschool', '",');
+  if Length(page) > 0 then
+    Result := page[random(length(page))]
+  else
+    Result := __OSRSDEFAULTWORLD;
+end;
+
+function TSmartSettings.GetParameters: TStringArray;
+var
+  page: string;
+begin
+  case self.RSVersion of
+    OSRS:
+    begin
+      SetLength(Result, 2);
+      Result[0] := 'http://oldschool'
+        + self.GetOSRSWorld + '.runescape.com/';
+      Result[1] := 'j1';
+    end;
+    RS3:
+    begin
+      page := getPage(__RS3URL);
+      Result := explode(',', between('<iframe id="game" src="', '"', page));
+    end;
+  end;
+end;
+
+function TSmartClient.Create: Boolean;
+var
+  params: TStringArray;
+  jPath: String;
+begin
+  writeln('Attempting to spawn new SMART client');
+  params := SMARTSettings.GetParameters;
+  if (Length(params) <> 2) then Exit(False);
+
+  if (SMARTSettings.ShowConsole) then
+    jPath := 'java.exe'
+  else
+    jPath := 'javaw.exe';
+
+  self.Target := 0;
+  case SMARTSettings.RSVersion of
+    OSRS:
+    begin
+      self.Width := 765;
+      self.Height := 503;
+      self.Target := smartSpawnClient(jPath, stringReplace(PluginPath, '\', '/', [rfReplaceAll]),
+        params[0], ',' + params[1], self.Width, self.Height, '', '', '', '');
+    end;
+
+    RS3:
+    begin
+      self.Width := 800;
+      self.Height := 600;
+      self.Target := smartSpawnClient(jPath, stringReplace(PluginPath, '\', '/', [rfReplaceAll]),
+        params[0], params[1], self.Width, self.Height, '', '', '', 'OpenGL32.dll');
+    end;
+  end;
+
+  if (self.Target <> 0) then
+  begin
+    writeln('Successfully spawned a SMART client');
+    self.PID := smartGetClientPID(self.Target);
+    self.Loaded := True;
+    Result := True;
+  end else
+    writeln('Failed to spawn a SMART client');
+
+end;
+
+function TSmartClient.PairToExisting: Boolean;
+var
+  PIDs: TIntegerArray;
+  i: Integer;
+  t: PtrUInt;
+begin
+  PIDs := SMARTSettings.GetPIDs;
+
+  if (length(PIDs) < 1) then Exit(False);
+
+  writeln('Found ' + ToStr(length(PIDs)) + ' free client(s), attempting to pair to one...');
+
+  for i := 0 to high(PIDs) do
+  begin
+    t := 0;
+    t := SmartPairClient(PIDs[i]);
+
+    if (t <> 0) then
+    begin
+       self.PID := PIDs[i];
+       self.Target := t;
+
+       if (not (smartEnabled(self.Target))) then
+         smartSetEnabled(self.Target, True);
+
+       writeln('Succesfully paired to a existing client, SMART['+ ToStr(self.PID) +']');
+       self.Loaded := True;
+       Exit(True);
+    end else begin
+      writeln('Failed to pair to SMART['+ intToStr(PIDs[i]) +']');
+      smartFreeClient(t);
+    end;
+  end;
+end;
+
+function TSmartClient.SetAsTarget: Boolean;
+begin
+  try
+    setEIOSTarget('libsmartremote', intToStr(self.PID));
+    writeln('Succesfully set SMART['+ intToStr(self.PID) +'] as Simba''s target');
+    Result := True;
+  except
+    writeln('Failed to set SMART['+ intToStr(self.PID) +'] as Simba''s target');
+  end;
+end;
+
+procedure TSmartClient.Init;
+begin
+   case SMARTSettings.RSVersion of
+    OSRS:
+    begin
+      self.Width := 765;
+      self.Height := 503;
+    end;
+
+    RS3:
+    begin
+      self.Width := 800;
+      self.Height := 600;
+    end;
+  end;
+
+  if not SMARTSettings.ForceNew then
+  begin
+    if not self.PairToExisting then
+      self.Loaded := self.Create
+    else
+      self.Loaded := True;
+  end else
+    self.Loaded := self.Create;
+
+  if not self.Loaded then Exit;
+
+  if not self.SetAsTarget then
+  begin
+    self.Free;
+    Exit;
+  end;
+
+  smartSetDebug(self.Target, true);
+  try
+    self.Image.init(Client.getMBitmaps());
+    self.Image.setName('SMART Debug Image');
+    self.Image.setPersistentMemory(SmartDebugArray(self.Target), self.Width, self.Height);
+    self.Image.drawClear(0);
+    writeln('Succesfully setup SMART drawing');
+  except
+    writeln('Failed to setup SMART drawing');
+  end;
+end;
+
+procedure TSmartClient.Free;
+begin
+  try
+    self.Image.resetPersistentMemory;
+    self.Image.free;
+    writeln('Succesfully freed SMART drawing');
+    smartFreeClient(self.Target);
+    writeln('Successfully Freed SMART[' + ToStr(self.PID) + ']');
+    self.Loaded := False;
+  except
+    writeln('Failed to Free SMART[' + ToStr(self.PID) + ']');
+  end;
+end;
+
+procedure TSmartClient.Destroy;
+begin
+  try
+    smartKillClient(self.PID);
+    writeln('Successfully destroyed SMART[' + ToStr(self.PID) + ']');
+  except
+    writeln('Failed to destory SMART[' + ToStr(self.PID) + ']');
+  end;
+end;
