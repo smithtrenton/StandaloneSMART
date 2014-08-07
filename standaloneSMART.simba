@@ -8,7 +8,7 @@ RS3 or OSRS.
 *)
 
 {$loadlib libsmartremote}
-{$i ..\StandaloneSMART\drawing.simba}
+{$i standaloneSMART/drawing.simba}
 
 const
   __OSRSURL = ['http://oldschool', '.runescape.com'];
@@ -105,10 +105,14 @@ begin
   params := SMARTSettings.GetParameters;
   if (Length(params) <> 2) then Exit(False);
 
+
   if (SMARTSettings.ShowConsole) then
-    jPath := 'java.exe'
+    jPath := 'java'
   else
-    jPath := 'javaw.exe';
+    jPath := 'javaw';
+  {$IFNDEF LINUX}
+    jPath := jPath + '.exe';
+  {$ENDIF}
 
   self.Target := 0;
   case SMARTSettings.RSVersion of
