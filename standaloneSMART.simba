@@ -25,13 +25,14 @@ type
   end;
 
   TSmartClient = record
-    PID, Target, Width, Height: Integer;
+    PID, Target: PtrUInt;
+    Width, Height: Integer;
     Loaded: Boolean;
     Image: TMufasaBitmap;
   end;
 
 var
-  SMARTSettings: TSmartSettings = [False, False, OSRS, ['']];
+  SMARTSettings: TSmartSettings = [True, False, OSRS, ['']];
 
 function TSmartSettings.GetPIDs: TIntegerArray;
 var
@@ -51,16 +52,16 @@ var
   PIDs: TIntegerArray;
 begin
   PIDs := self.GetPIDs;
-  writeln('  Attempting to kill ' + ToStr(Length(PIDs)) + ' SMARTs: ', PIDs);
+  writeln('  Attempting to kill ' + ToString(Length(PIDs)) + ' SMARTs: ', PIDs);
   if (Length(PIDs) > 0) then
   for i := 0 to High(PIDs) do
   try
     SmartKillClient(PIDs[i]);
     Inc(freed);
   except
-    writeln('    Failed to kill SMART[' + ToStr(PIDs[i]) + ']');
+    writeln('    Failed to kill SMART[' + ToString(PIDs[i]) + ']');
   end;
-  writeln('  Killed ' + ToStr(freed) + ' SMARTs');
+  writeln('  Killed ' + ToString(freed) + ' SMARTs');
 end;
 
 function TSmartSettings.GetOSRSWorld: String;
@@ -149,7 +150,7 @@ begin
 
   if (length(PIDs) < 1) then Exit(False);
 
-  writeln('Found ' + ToStr(length(PIDs)) + ' free client(s), attempting to pair to one...');
+  writeln('Found ' + ToString(length(PIDs)) + ' free client(s), attempting to pair to one...');
 
   for i := 0 to high(PIDs) do
   begin
@@ -164,7 +165,7 @@ begin
        if (not (smartEnabled(self.Target))) then
          smartSetEnabled(self.Target, True);
 
-       writeln('Succesfully paired to a existing client, SMART['+ ToStr(self.PID) +']');
+       writeln('Succesfully paired to a existing client, SMART['+ ToString(self.PID) +']');
        self.Loaded := True;
        Exit(True);
     end else begin
@@ -237,10 +238,10 @@ begin
     self.Image.free;
     writeln('Succesfully freed SMART drawing');
     smartFreeClient(self.Target);
-    writeln('Successfully Freed SMART[' + ToStr(self.PID) + ']');
+    writeln('Successfully Freed SMART[' + ToString(self.PID) + ']');
     self.Loaded := False;
   except
-    writeln('Failed to Free SMART[' + ToStr(self.PID) + ']');
+    writeln('Failed to Free SMART[' + ToString(self.PID) + ']');
   end;
 end;
 
@@ -248,8 +249,8 @@ procedure TSmartClient.Destroy;
 begin
   try
     smartKillClient(self.PID);
-    writeln('Successfully destroyed SMART[' + ToStr(self.PID) + ']');
+    writeln('Successfully destroyed SMART[' + ToString(self.PID) + ']');
   except
-    writeln('Failed to destory SMART[' + ToStr(self.PID) + ']');
+    writeln('Failed to destory SMART[' + ToString(self.PID) + ']');
   end;
 end;
