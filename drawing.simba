@@ -573,7 +573,7 @@ Example:
     tmb.drawText('hello world!', point(55, 55), upchars, false, clRed);
 
 *)
-procedure TMufasaBitmap.drawText(txt: string; pnt: TPoint; font: string; shadow: boolean; color: TColor);
+procedure TMufasaBitmap.drawText(txt: string; pnt: TPoint; font: string; shadow: boolean; color: TColor); overload;
 var
   tpa, tpaShadow: TPointArray;
   w, h: Integer;
